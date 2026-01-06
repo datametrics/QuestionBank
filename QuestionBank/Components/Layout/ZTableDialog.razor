@@ -1,0 +1,24 @@
+<MudDialog>
+    <DialogContent>
+        <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+            <MudTabPanel Text="Positive Z-Table">
+                <MudImage Src="images/positiveztable.png" Alt="Logo" />
+            </MudTabPanel>
+            <MudTabPanel Text="Negative Z-Table">
+                <MudImage Src="images/negativeztable.png" Alt="Logo" />
+            </MudTabPanel>
+        </MudTabs>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="CloseDialog">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+@code {
+   
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+    private void CloseDialog()
+    {
+        MudDialog.Close("ok");
+    }
+}

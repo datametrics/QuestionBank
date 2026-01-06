@@ -1,0 +1,82 @@
+@using QuestionBank.Components.Model
+@inject FormulaStore Store
+@inject IJSRuntime Js
+
+<MudDialog>
+    <DialogContent>
+        <div id="print-area">
+        <!-- 🔍 Search box -->
+        <MudTextField @bind-Value="_searchTerm"
+                      Placeholder="Search formulas..."
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Class="mb-3"
+                      Immediate="true"/>
+        <MudButton Color="Color.Secondary" OnClick="PrintDialog">Print</MudButton>
+        @foreach (var group in FilteredFormulas.GroupBy(f => f.Topic))
+        {
+            <MudDivider/>
+            <MudText Typo="Typo.subtitle1" Color="Color.Primary">@group.Key</MudText>
+
+            @foreach (var item in group)
+            {
+                <MudGrid Style="width: 800px">
+                    <MudItem xs="4">
+                        <MudText Typo="Typo.body2">@item.Name</MudText>
+                    </MudItem>
+                    <MudItem xs="8">
+                        <MudText Typo="Typo.h6" Class="math">@item.Formula</MudText>
+                    </MudItem>
+                </MudGrid>
+
+            }
+        }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="CloseDialog">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+@code {
+    private string _searchTerm = string.Empty;
+    private async Task PrintDialog()
+    {
+        await Js.InvokeVoidAsync("printElement", "print-area");
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.Delay(100);
+        await Js.InvokeVoidAsync("renderLatex");
+    }
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private IEnumerable<FormulaItem> FilteredFormulas
+    {
+        get
+        {
+            // whenever search term changes, clear first
+            var source = string.IsNullOrWhiteSpace(_searchTerm)
+                ? Store.Formulas
+                : Store.Formulas.Where(f =>
+                    f.Name.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    f.Formula.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    f.Topic.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase));
+
+            Task.Delay(100);
+           // Js.InvokeVoidAsync("renderLatex2");
+            return source;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await Task.Delay(100);
+    }
+
+    private void CloseDialog()
+    {
+        MudDialog.Close("ok");
+    }
+}

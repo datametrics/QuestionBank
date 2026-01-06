@@ -1,0 +1,20 @@
+[
+  {
+    "QuestionBody": "What is the correct answer to this question?",
+    "Answer1": "Option A",
+    "Answer2": "Option B",
+    "Answer3": "Option C",
+    "Answer4": "Option D",
+    "Explanation": "This is the reason why B is true",
+    "CorrectAnswerId": 2
+  },
+  {
+    "QuestionBody": "What is the correct answer to this second question?",
+    "Answer1": "Option A",
+    "Answer2": "Option B",
+    "Answer3": "Option C",
+    "Answer4": "Option D",
+    "Explanation": "This is the reason why A is true",
+    "CorrectAnswerId": 1
+  }
+]

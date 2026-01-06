@@ -1,0 +1,194 @@
+@inject ConfigService ConfigService
+@inject ISnackbar Snackbar
+@page "/JsonParser"
+@using System.Text.Json
+@using QuestionBank.Components.Model
+@using QuestionBank.Components.Services
+
+<h3>Json QuestionParser</h3>
+
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Style="width: 100%;">
+    <MudRadioGroup T="Part" Label="Select an option" @bind-Value="SelectedPart">
+        @foreach (var option in Enum.GetValues(typeof(Part)).Cast<Part>())
+        {
+            <MudRadio Value="@option">@option.ToString()</MudRadio>
+        }
+    </MudRadioGroup>
+    <MudTextField Label="Reference" T="string" @bind-Value="@SelectedReference" Immediate="true" />
+    <MudTextField Label="Topic" T="int?" @bind-Value="@SelectedTopic" Immediate="true" />
+
+    <MudTextField Label="Chapter" T="int?" @bind-Value="@SelectedChapter" Immediate="true" />
+    <MudTextField Label="Question Offset" T="int?" @bind-Value="@SelectedOffset" Immediate="true" />
+    <MudTextField Label="Learning objective" T="string" @bind-Value="@SelectedLearningObjective" Immediate="true" />
+
+    <MudGrid Justify="Justify.FlexStart">
+        <MudItem xs="1">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => StartParsing()" Class="equal-button">Start</MudButton>
+        </MudItem>
+        <MudItem xs="1">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => ClearResults()" Class="equal-button">Clear</MudButton>
+        </MudItem>
+        <MudItem xs="1">
+            <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="() => SaveResults()" Class="equal-button">Save</MudButton>
+        </MudItem>
+    </MudGrid>
+    <br/>
+    <MudText Typo="Typo.h6" GutterBottom="true">Parsed Questions</MudText>
+    <MudTabs>
+        @foreach (var question in _resultingQuestions)
+        {
+            <MudTabPanel Text="@question.BtId">
+                <MudTextField Label="Id" T="int" @bind-Value="question.Id" Immediate="true" />
+                <MudTextField Label="Part" T="Part" @bind-Value="question.Part" Immediate="true" />
+            
+                <MudTextField Label="BtId" T="string" @bind-Value="question.BtId" Immediate="true" />
+                <MudTextField Label="Answer" T="int" @bind-Value="question.CorrectAnswerId" Immediate="true" />
+
+                <MudTextField Label="Reference" T="string" @bind-Value="question.Reference" Immediate="true" />
+                
+                <MudTextField Label="Topic" T="int?" @bind-Value="question.Topic" Immediate="true" />
+                <MudTextField Label="Chapter" T="int?" @bind-Value="question.Chapter" Immediate="true" />
+                <MudTextField Label="LearningObjective" T="string" @bind-Value="question.LearningObjective" Immediate="true" />
+            
+                <MudText Typo="Typo.h6" GutterBottom="true">Question Layout</MudText>
+                <MudText Typo="Typo.body1">@(FormatText(question.QuestionBody))</MudText>
+                <br/>
+                <MudRadioGroup T="string" Label="Select an answer">
+
+                    <MudStack Row="false">
+                        <MudRadio T="string" Label="@question.Answer1"/>
+                        <MudRadio T="string" Label="@question.Answer2"/>
+                        <MudRadio T="string" Label="@question.Answer3"/>
+                        <MudRadio T="string" Label="@question.Answer4"/>
+                    </MudStack>
+                </MudRadioGroup>
+                <br/>
+                <br/>
+                <MudText Typo="Typo.h6" GutterBottom="true">Explanation</MudText>
+                <MudText Typo="Typo.body1">@(FormatText(question.Explanation))</MudText>
+            </MudTabPanel>
+        }
+    </MudTabs>
+   
+</MudContainer>
+<br/>
+<MudText Typo="Typo.h6" GutterBottom="true">Input</MudText>
+<MudTextField T="string" Label="Enter your text..." Variant="Variant.Filled" AutoGrow="true" FullWidth="true" Immediate="true" @bind-Value="_input" />
+
+@code {
+    private readonly List<Question> _resultingQuestions = new();
+    private string? SelectedReference { get; set; } = string.Empty;
+    private string? SelectedLearningObjective { get; set; } = string.Empty;
+    private int? SelectedTopic { get; set; } = 2;
+    private int? SelectedChapter { get; set; } = 1;
+    private int? SelectedOffset { get; set; } = 0;
+
+
+    private MarkupString FormatText(string? text)
+    {
+        return (MarkupString)(text?.Replace("\n", "<br>") ?? string.Empty);
+    }
+
+    private void StartParsing()
+    {
+        List<Question> questions = [];
+
+        var questionDtos = JsonSerializer.Deserialize<List<QuestionDto>>(_input);
+        if (questionDtos != null)
+        {
+            for (var i = 0; i < questionDtos.Count; i++)
+            {
+                var questionDto = questionDtos[i];
+                var question = new Question
+                {
+                    Part = SelectedPart,
+                    Reference = SelectedReference,
+                    BtId = MakeCustomBtId(i),
+                    QuestionBody = questionDto.QuestionBody,
+                    Answer1 = questionDto.Answer1,
+                    Answer2 = questionDto.Answer2,
+                    Answer3 = questionDto.Answer3,
+                    Answer4 = questionDto.Answer4,
+                    CorrectAnswerId = questionDto.CorrectAnswerId,
+                    Difficulty = Difficulty.Medium,
+                    LearningObjective = SelectedLearningObjective,
+                    Topic = SelectedTopic,
+                    Chapter = SelectedChapter,
+                    Explanation = questionDto.Explanation
+                };
+                questions.Add(question);
+            }
+        }
+
+
+        _resultingQuestions.Clear();
+        _resultingQuestions.AddRange(questions);
+    }
+
+    private string MakeCustomBtId(int i)
+    {
+        int partId = (int)SelectedPart;
+        int topic = SelectedTopic ?? 0;
+        int chapter = SelectedChapter ?? 0;
+        int questionId = i;
+
+        return $"{partId}.{topic}.{chapter}.{SelectedOffset + questionId}";
+    }
+
+    private void ClearResults()
+    {
+        _resultingQuestions.Clear();
+        _input = string.Empty;
+        Snackbar.Add("Input cleared", Severity.Info);
+    }
+
+    public Part SelectedPart { get; set; } = Part.Part2;
+    private string _input = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        string rawJson = """"
+                         [
+                           {
+                             "QuestionBody": "What is the correct answer to this question?",
+                             "Answer1": "Option A",
+                             "Answer2": "Option B",
+                             "Answer3": "Option C",
+                             "Answer4": "Option D",
+                             "Explanation": "This is the reason why B is true",
+                             "CorrectAnswerId": 2
+                           },
+                           {
+                             "QuestionBody": "What is the correct answer to this second question?",
+                             "Answer1": "Option A",
+                             "Answer2": "Option B",
+                             "Answer3": "Option C",
+                             "Answer4": "Option D",
+                             "Explanation": "This is the reason why A is true",
+                             "CorrectAnswerId": 1
+                           }
+                         ]
+                         """";
+        
+        _input = rawJson;
+    }
+   
+    private async Task SaveResults()
+    {
+        await ConfigService.SaveQuestionsAsync(_resultingQuestions);
+        Snackbar.Add($"Successfully saved {_resultingQuestions.Count} new questions to question store", Severity.Success);
+    }
+
+}
+<style>
+.equal-button {
+    width: 120px;
+    margin-right: 10px;
+    margin-top: 10px;
+}
+.large-text-field {
+    height: 500px;
+}
+</style>
+

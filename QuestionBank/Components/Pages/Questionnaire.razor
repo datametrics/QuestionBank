@@ -1,0 +1,687 @@
+﻿
+@inject ConfigService ConfigService
+@inject QuestionSampler QuestionSampler
+@inject ISnackbar Snackbar
+@inject IJSRuntime Js
+@inject ResultsManager ResultsManager
+@page "/"
+@using QuestionBank.Components.Model
+@using QuestionBank.Components.Services
+
+<PageTitle>Questionnaire</PageTitle>
+
+    <MudExpansionPanel Text="Questions" Expanded="ShowConfig">
+         <MudPaper Class="pa-16 ma-2" Outlined="true">
+             <MudStack Spacing="2">
+                 <MudText Typo="Typo.h6">Select your questions</MudText>
+                 <MudTreeView Items="@TreeItems" SelectionMode="SelectionMode.MultiSelection" @bind-SelectedValues="SelectedValues">
+                     <ItemTemplate>
+                         @{
+                             var presenter = context as TreeItemPresenter;
+                         }
+                         <MudTreeViewItem @bind-Expanded="@context.Expanded" Items="@context.Children" Value="@context.Value"
+                                          Icon="@context.Icon" Text="@context.Text" EndText="@presenter?.QuestionCount?.ToString()" EndTextTypo="@Typo.caption"/>
+                     </ItemTemplate>
+                 </MudTreeView>
+             </MudStack>
+        </MudPaper>
+    </MudExpansionPanel>
+    <MudExpansionPanel Text="Quiz Configuration" Expanded="ShowConfig">
+        <MudPaper Class="pa-16 ma-2" Outlined="true">
+            <MudText Typo="Typo.h6">Quiz Configuration</MudText>
+            <MudStack Row="true">
+                <MudSelect T="int" Label="Select Time" @bind-Value="SelectedTime" Disabled="@IsTimerDisabled">
+                    @foreach (var minute in Enumerable.Range(1, 240))
+                    {
+                        <MudSelectItem Value="@minute">@minute min</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudButton Variant="Variant.Filled" Color="Color.Info" Class="equal-button" OnClick="ToggleTimer">Timer</MudButton>
+            </MudStack>
+            <MudSelect T="int" Label="Number of questions" @bind-Value="SelectedNumberOfQuestions">
+                @foreach (var value in Enumerable.Range(1, 50))
+                {
+                    <MudSelectItem Value="@value">@value</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="FlagType" Label="FlagType" @bind-Value="SelectedFlagType">
+                @foreach (var option in Enum.GetValues(typeof(FlagType)).Cast<FlagType>())
+                {
+                    <MudSelectItem Value="@option">@option.ToString()</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="Difficulty" Label="Select Difficulty" @bind-Value="SelectedDifficulty">
+                @foreach (var option in Enum.GetValues(typeof(Difficulty)).Cast<Difficulty>())
+                {
+                    <MudSelectItem Value="@option">@option.ToString()</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="QuizStyle" Label="Select Quiz Style" @bind-Value="SelectedQuizStyle">
+                @foreach (var option in Enum.GetValues(typeof(QuizStyle)).Cast<QuizStyle>())
+                {
+                    <MudSelectItem Value="@option">@option.ToString()</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="SamplingMode" Label="Select Sampling Mode" @bind-Value="SelectedSamplingMode">
+                @foreach (var option in Enum.GetValues(typeof(SamplingMode)).Cast<SamplingMode>())
+                {
+                    <MudSelectItem Value="@option">@option.ToString()</MudSelectItem>
+                }
+            </MudSelect>
+            <MudGrid Justify="Justify.FlexStart" Spacing="2" Style="margin-top:20px">
+                <MudItem xs="12" sm="12" md="2">
+                    <MudButton FullWidth Variant="Variant.Filled" Class="equal-button" Color="Color.Primary" OnClick="StartQuiz">Start</MudButton>
+                </MudItem>
+                <MudItem xs="12" sm="12" md="2">
+                    <MudButton FullWidth Variant="Variant.Filled" Class="equal-button" Color="Color.Secondary" OnClick="Reset">Reset</MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    </MudExpansionPanel>
+    
+<div @ref="_panel1Ref3">
+    <MudExpansionPanel Text="Questionnaire" Expanded="ShowQuiz">
+        <MudPaper Class="pa-16 ma-2" Outlined="true">
+            @if (CurrentModel != null)
+            {
+                <MudStack Row="true" Class="d-flex justify-content-between">
+                    <MudText Typo="Typo.h4" Align="Align.Right" GutterBottom="true">Question: @CurrentQuestionNumber of @TotalQuestions</MudText>
+                </MudStack>
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6"><MudTextField Label="ID" Value="@CurrentQuestion.Id.ToString()" ReadOnly="true"/></MudItem>
+                    <MudItem xs="12" sm="6"><MudTextField Label="BT ID" Value="@CurrentQuestion.BtId" ReadOnly="true"/></MudItem>
+                    <MudItem xs="12" sm="6"><MudTextField Label="Topic" Value="@CurrentQuestion.Topic.ToString()" ReadOnly="true"/></MudItem>
+                    <MudItem xs="12" sm="6"><MudTextField Label="Chapter" Value="@CurrentQuestion.Chapter.ToString()" ReadOnly="true"/></MudItem>
+                    <MudItem xs="12" sm="6"><MudTextField Value="@(_quizTimer?.DisplayTime ?? "00:00:00")" ReadOnly="true" Label="Timer"/></MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="FlagType" Label="Select FlagType" @bind-Value="@CurrentQuestion.FlagType">
+                            @foreach (var option in Enum.GetValues(typeof(FlagType)).Cast<FlagType>())
+                            {
+                                <MudSelectItem Value="@option">@option.ToString()</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="12">
+                        @if (!string.IsNullOrWhiteSpace(CurrentQuestion.Reference) &&
+                             CurrentQuestion.Reference.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <MudStack Spacing="0">
+                                <MudText Typo="Typo.caption" Class="mb-n2">Reference</MudText>
+                                <MudLink Href="@CurrentQuestion.Reference" Target="_blank">
+                                    @CurrentQuestion.Reference
+                                </MudLink>
+                            </MudStack>
+                        }
+                        else
+                        {
+                            <MudTextField Label="Reference"
+                                          Value="@CurrentQuestion.Reference"
+                                          ReadOnly="true" />
+                        }
+                    </MudItem>
+                    <MudItem xs="12" sm="12"><MudTextField Label="Learning Objective" Value="@CurrentQuestion.LearningObjective" ReadOnly="true"/></MudItem>
+                </MudGrid>
+                <br/>
+                <MudText Typo="Typo.body1">@FormatText(CurrentQuestion.QuestionBody)</MudText>
+                <br/>
+                <MudRadioGroup Label="Select an answer" @bind-Value="@CurrentQuestion.SelectedAnswer">
+                    <MudStack Direction="Column">
+                        @foreach (var answer in CurrentQuestion.Answers)
+                        {
+                            <MudRadio Dense="true" Value="@answer.Id" Label="@(FormatText(answer.Text).ToString())"/>
+                        }
+                    </MudStack>
+                </MudRadioGroup>
+
+                <MudGrid Justify="Justify.FlexStart" Spacing="2" Style="margin-top:20px">
+                    <MudItem xs="12" sm="12" md="2">
+                        <MudButton FullWidth Variant="Variant.Filled" Color="Color.Primary"
+                                   Disabled="@IsFirstQuestion" OnClick="GoToPrevious">
+                            Previous
+                        </MudButton>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="12" md="2">
+                        <MudButton FullWidth Variant="Variant.Filled" Color="Color.Primary"
+                                   Disabled="@IsLastQuestion" OnClick="GoToNext">
+                            Next
+                        </MudButton>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="12" md="2">
+                        <MudButton FullWidth Variant="Variant.Filled" Color="Color.Warning"
+                                   Disabled="@(!HasSelectedAnswer)" OnClick="Grade">
+                            Grade
+                        </MudButton>
+                    </MudItem>
+
+                    @if (IsLastQuestion)
+                    {
+                        <MudItem xs="12" sm="12" md="2">
+                            <MudButton FullWidth Variant="Variant.Filled" Color="Color.Info"
+                                       OnClick="Submit">
+                                Submit
+                            </MudButton>
+                        </MudItem>
+                    }
+                </MudGrid>
+
+
+            }
+        </MudPaper>
+    </MudExpansionPanel>
+</div>
+
+    <MudExpansionPanel Text="Explanation" Expanded="ShowExplanation">
+        <MudPaper Class="pa-16 ma-2" Outlined="true">
+            @if (CurrentModel != null)
+            {
+                @if (CurrentQuestion.IsCorrectlyAnswered())
+                {
+                    <MudText Typo="Typo.body1">You got this CORRECT.</MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body1">You got this WRONG.</MudText>
+                    <MudText Typo="Typo.body1">The correct answer is @CurrentQuestion.CorrectAnswer</MudText>
+                }
+
+                <br>
+                <MudText Typo="Typo.h4" GutterBottom="true">Explanation</MudText>
+                <MudText Typo="Typo.body1">@FormatText(CurrentQuestion.Explanation)</MudText>
+            }
+        </MudPaper>
+    </MudExpansionPanel>
+     <MudExpansionPanel Text="Results" Expanded="ShowResult">
+        <MudPaper Class="pa-16 ma-2" Outlined="true">
+            <MudText Typo="Typo.h6" GutterBottom="true">Quiz Results</MudText>
+            @if (CurrentModel?.EndTime != null)
+            {
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="4"><MudTextField Label="Start" Value="@CurrentModel.StartTime.ToString("yyyy-MM-dd HH:mm:ss")"/></MudItem>
+                    <MudItem xs="12" sm="4"><MudTextField Label="End" Value="@CurrentModel.EndTime.GetValueOrDefault().ToString("yyyy-MM-dd HH:mm:ss")"/></MudItem>
+                    <MudItem xs="12" sm="4"><MudTextField Label="Answers" Value="@CurrentModel.Items.Count"/></MudItem>
+                    <MudItem xs="12" sm="4"><MudTextField Label="Duration" Value="@CurrentModel.GetFormattedDuration()"/></MudItem>
+                    <MudItem xs="12" sm="4"><MudTextField Label="Correct Answers" Value="@CurrentModel.CorrectCount"/></MudItem>
+                    <MudItem xs="12" sm="4"><MudTextField Label="Incorrect Answers" Value="@CurrentModel.IncorrectCount"/></MudItem>
+                    <MudItem xs="12" sm="4"><MudTextField Label="Correct Answers %" Value="@CurrentModel.PercentCorrect.ToString("P")"/></MudItem>
+                </MudGrid>
+            }
+        </MudPaper>
+    </MudExpansionPanel>
+<MudExpansionPanel Text="Statistics" Expanded="true">
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+        <MudTabPanel Text="Quiz Runs">
+            <MudPaper Class="pa-16 ma-2" Outlined="true">
+                <MudDataGrid T="QuestionResultSet"
+                             Items="_resultSets"
+                             Dense="true"
+                             Hover="true"
+                             Bordered="true"
+                             Striped="false"
+                             RowsPerPage="5"
+                             Elevation="0"
+                             SortMode="SortMode.Multiple">
+
+                    <Columns>
+
+                        <PropertyColumn Property="x => x.TimeStamp"
+                                        Title="TimeStamp"
+                                        Filterable="true"
+                                        Format="g"
+                                        Sortable="true"/>
+
+                        <PropertyColumn Property="x => x.Start"
+                                        Title="Start"
+                                        Filterable="true"
+                                        Format="g"
+                                        Sortable="true"/>
+
+                        <PropertyColumn Property="x => x.End"
+                                        Title="End"
+                                        Filterable="true"
+                                        Format="g"
+                                        Sortable="true"/>
+
+                        <!-- Duration -->
+                        <TemplateColumn Title="Duration (min)"
+                                        Sortable="true"
+                                        SortBy="@(x => (x.End - x.Start).TotalMinutes)">
+                            <CellTemplate>
+                                @{
+                                    var duration = (context.Item.End - context.Item.Start).TotalMinutes;
+                                }
+                                @duration.ToString("F1")
+                            </CellTemplate>
+                        </TemplateColumn>
+
+                        <PropertyColumn Property="x => x.UserId"
+                                        Title="UserId"
+                                        Sortable="true"/>
+
+                        <!-- Questions -->
+                        <TemplateColumn Title="Questions"
+                                        Sortable="true"
+                                        SortBy="@(x => x.QuestionResults?.Count ?? 0)">
+                            <CellTemplate>
+                                @context.Item.QuestionResults?.Count
+                            </CellTemplate>
+                        </TemplateColumn>
+
+                        <!-- Correct -->
+                        <TemplateColumn Title="Correct"
+                                        Sortable="true"
+                                        SortBy="@(x => x.QuestionResults?.Count(q => q.CorrectAnswerId == q.SelectedAnswerId) ?? 0)">
+                            <CellTemplate>
+                                @context.Item.QuestionResults?.Count(q => q.CorrectAnswerId == q.SelectedAnswerId)
+                            </CellTemplate>
+                        </TemplateColumn>
+
+                        <!-- Correct Pct -->
+                        <TemplateColumn Title="Correct Pct."
+                                        Sortable="true"
+                                        SortBy="@(x =>
+                                                    x.QuestionResults != null && x.QuestionResults.Count > 0
+                                                        ? (double)x.QuestionResults.Count(q => q.CorrectAnswerId == q.SelectedAnswerId)
+                                                          / x.QuestionResults.Count
+                                                        : 0)">
+                            <CellTemplate>
+                                @{
+                                    var total = context.Item.QuestionResults?.Count ?? 0;
+                                    var correct = context.Item.QuestionResults?.Count(q => q.CorrectAnswerId == q.SelectedAnswerId) ?? 0;
+                                    var percent = total > 0 ? (double)correct / total * 100 : 0;
+                                }
+                                @percent.ToString("F1")%
+                            </CellTemplate>
+                        </TemplateColumn>
+
+                    </Columns>
+
+                    <PagerContent>
+                        <MudDataGridPager T="QuestionResultSet" PageSizeOptions="new int[] { 5, 10, 20, 50 }"/>
+                    </PagerContent>
+
+                </MudDataGrid>
+            </MudPaper>
+        </MudTabPanel>
+        <MudTabPanel Text="Question Statistics">
+            <MudPaper Class="pa-16 ma-2" Outlined="true">
+                <MudDataGrid T="QuestionStatistic"
+                             Items="_questionStats"
+                             Dense="true"
+                             Hover="true"
+                             Bordered="true"
+                             Filterable="true"
+                             Elevation="0"
+                             RowsPerPage="5"
+                             SortMode="SortMode.Multiple">
+
+                    <Columns>
+
+                        <PropertyColumn
+                            Property="x => x.QuestionId"
+                            Title="Id"
+                            Sortable="true"
+                            Filterable="true"/>
+
+                        <PropertyColumn
+                            Property="x => x.Topic"
+                            Title="Topic"
+                            Sortable="true"
+                            Filterable="true"/>
+
+                        <PropertyColumn
+                            Property="x => x.Chapter"
+                            Title="Chapter"
+                            Sortable="true"
+                            Filterable="true"/>
+
+                        <PropertyColumn
+                            Property="x => x.Part"
+                            Title="Part"
+                            Sortable="true"
+                            Filterable="true"/>
+
+                        <PropertyColumn
+                            Property="x => x.RetryCount"
+                            Title="Retries"
+                            Sortable="true"
+                            Filterable="false"/>
+
+                    </Columns>
+                    <PagerContent>
+                        <MudDataGridPager T="QuestionStatistic" PageSizeOptions="new int[] { 5, 10, 20, 50 }"/>
+                    </PagerContent>
+                </MudDataGrid>
+            </MudPaper>
+        </MudTabPanel>
+     
+    </MudTabs>
+    
+    <MudPaper Class="pa-16 ma-2" Outlined="true">
+
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6">Statistics</MudText>
+            <MudTreeView Items="@ResultItems">
+                <ItemTemplate>
+                    @{
+                        var presenter = context as TreeItemPresenter;
+                        var statsText = $"Correct: {presenter?.CorrectPercentage.GetValueOrDefault():P0} (Processed: {presenter?.ProcessedCount}/{presenter?.TotalCount})";
+                    }
+                    <MudTreeViewItem @bind-Expanded="@context.Expanded" Items="@context.Children" Value="@context.Value"
+                                     Icon="@context.Icon" Text="@context.Text" EndText="@statsText" EndTextTypo="@Typo.caption"/>
+                </ItemTemplate>
+            </MudTreeView>
+        </MudStack>
+    </MudPaper>
+    <MudPaper Class="pa-16 ma-2" Outlined="true">
+        <MudGrid Justify="Justify.Center">
+            <MudItem xs="12" sm="8" md="6" Class="d-flex justify-center" Style="height:300px;">
+                <MudChart ChartType="ChartType.Bar"
+                          XAxisLabels="_xAxisLabels"
+                          ChartSeries="_series"
+                          Width="100%"
+                          Height="100%"
+                          AxisChartOptions="_axisChartOptions"/>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudGrid Justify="Justify.FlexStart" Spacing="2" Style="margin-top:20px">
+        <MudItem xs="12" sm="12" md="2">
+            <MudButton FullWidth Variant="Variant.Filled" Class="equal-button" Color="Color.Primary" OnClick="ClearStatistics">Clear</MudButton>
+        </MudItem>
+    </MudGrid>
+</MudExpansionPanel>
+
+
+
+@code {
+    // Dependencies
+    private QuestionTreeBuilder _treeBuilder = new();
+    private QuestionSelector _questionSelector = new();
+    private StatisticsGenerator? _statisticsGenerator;
+    private QuizTimer? _quizTimer;
+
+    // UI State
+    private bool ShowConfig { get; set; } = true;
+    private bool ShowQuiz { get; set; }
+    private bool ShowExplanation { get; set; }
+    private bool ShowResult { get; set; }
+
+    // Quiz Configuration
+    public int SelectedTime { get; set; } = 60;
+    public int SelectedNumberOfQuestions { get; set; } = 25;
+    public Difficulty SelectedDifficulty { get; set; } = Difficulty.All;
+    public QuizStyle SelectedQuizStyle { get; set; } = QuizStyle.GradeIndividualy;
+    public SamplingMode SelectedSamplingMode { get; set; } = SamplingMode.AllQuestions;
+    public FlagType SelectedFlagType { get; set; } = FlagType.None;
+    private bool IsTimerDisabled { get; set; } = true;
+
+    // Question Selection
+    public IReadOnlyCollection<string> SelectedValues { get; set; } = [];
+    private List<TreeItemData<string>> TreeItems { get; set; } = new();
+    private List<TreeItemData<string>> ResultItems { get; set; } = new();
+    
+    private List<Question> Questions { get; set; } = [];
+    private List<Topic> Topics { get; set; } = [];
+
+    // Quiz State
+    private TestRunModel? CurrentModel { get; set; }
+    private int _currentIndex;
+    private List<QuestionResultSet> _resultSets = [];
+    private List<QuestionStatistic> _questionStats = [];
+    private List<ChartSeries> _series = [];
+    private string[] _xAxisLabels =[];
+    private readonly AxisChartOptions _axisChartOptions = new();
+    private ElementReference _panel1Ref3;
+
+    // Helper Properties
+    private Item CurrentQuestion => CurrentModel!.Items[_currentIndex];
+    private int CurrentQuestionNumber => _currentIndex + 1;
+    private int TotalQuestions => CurrentModel!.Items.Count;
+    private bool IsFirstQuestion => _currentIndex == 0;
+    private bool IsLastQuestion => _currentIndex == CurrentModel?.Items.Count - 1;
+    private bool HasSelectedAnswer => CurrentQuestion.SelectedAnswer != null;
+    
+    protected override void OnInitialized()
+    {
+        LoadConfiguration();
+        BuildQuestionTree();
+        LoadAndDisplayStatistics();
+    }
+
+    private void LoadConfiguration()
+    {
+        Questions.Clear();
+        Questions.AddRange(ConfigService.LoadConfig());
+        _statisticsGenerator = new StatisticsGenerator(Questions);
+        Topics.Clear();
+        Topics.AddRange(ConfigService.LoadTopics());
+    }
+
+    private void BuildQuestionTree()
+    {
+        TreeItems = _treeBuilder.BuildQuestionSelectionTree(Questions, Topics);
+    }
+
+    private void LoadAndDisplayStatistics()
+    {
+        _resultSets = ConfigService.LoadResultSets();
+        ResultItems = _statisticsGenerator!.GenerateStatisticsTree(_resultSets, Topics);
+        var (series, labels) = _statisticsGenerator.BuildChartSeries(_resultSets);
+        _series = series;
+        _xAxisLabels = labels;
+
+        _questionStats.Clear();
+        _questionStats = _statisticsGenerator.GetQuestionStatistics(_resultSets);
+    }
+
+    private MarkupString FormatText(string? text)
+    {
+        return (MarkupString)(text?.Replace("\n", "<br>") ?? string.Empty);
+    }
+
+    public void ToggleTimer()
+    {
+        IsTimerDisabled = !IsTimerDisabled;
+    }
+
+    public void GoToNext()
+    {
+        if (!(_currentIndex < CurrentModel?.Items.Count - 1)) return;
+        _currentIndex++;
+        UpdateExplanationVisibility();
+        Js.InvokeVoidAsync("scrollToElement", _panel1Ref3);
+    }
+
+    public void GoToPrevious()
+    {
+        if (_currentIndex <= 0) return;
+        _currentIndex--;
+        UpdateExplanationVisibility();
+        Js.InvokeVoidAsync("scrollToElement", _panel1Ref3);
+
+    }
+
+    private void UpdateExplanationVisibility()
+    {
+        ShowExplanation = CurrentQuestion.FinalAnswer != null;
+    }
+
+    public void Submit()
+    {
+        if (!ValidateAllQuestionsAnswered()) return;
+
+        FinalizeQuiz();
+        SaveQuizFlags();
+        DisplayResults();
+        SaveAndUpdateStatistics();
+    }
+
+    private bool ValidateAllQuestionsAnswered()
+    {
+        if (CurrentModel == null || CurrentModel.Items.All(x => x.FinalAnswer != null)) return true;
+        Snackbar.Add("Not all questions answered", Severity.Error);
+        return false;
+    }
+
+    private void FinalizeQuiz()
+    {
+        if (CurrentModel != null)
+        {
+            CurrentModel.EndTime = DateTime.Now;
+        }
+        _quizTimer?.Stop();
+    }
+
+    private void SaveQuizFlags()
+    {
+        if (CurrentModel != null)
+        {
+            ConfigService.SaveFlags(CurrentModel.Items);
+        }
+    }
+
+    private void DisplayResults()
+    {
+        ShowResult = true;
+        Snackbar.Add($"You reached {CurrentModel?.PercentCorrect:P}", Severity.Success);
+    }
+
+    private void SaveAndUpdateStatistics()
+    {
+        if (CurrentModel == null || ResultsManager == null) return;
+        _resultSets = ResultsManager.SaveResults(CurrentModel);
+        ResultItems = _statisticsGenerator!.GenerateStatisticsTree(_resultSets, Topics);
+        var (series, labels) = _statisticsGenerator.BuildChartSeries(_resultSets);
+        _series = series;
+        _xAxisLabels = labels;
+    }
+
+    public async Task ClearStatistics()
+    {
+        bool confirmed = await Js.InvokeAsync<bool>("confirm", "Are you sure you want to delete all statistics?");
+        
+        if (confirmed)
+        {
+            // Perform deletion logic here
+            await ConfigService.DeleteResultSetsAsync();
+            ResultItems.Clear();
+            _resultSets.Clear();
+            _series.Clear();
+            _xAxisLabels = [];
+            Snackbar.Add("Results purged!", Severity.Warning);
+        }
+
+    }
+    
+    public Task StartQuiz()
+    {
+        var selectedQuestions = _questionSelector.GetSelectedQuestions(SelectedValues, Questions);
+
+        if (!ValidateQuestionsSelected(selectedQuestions))
+        {
+            return Task.CompletedTask;
+        }
+
+        var previousResults = ConfigService.LoadResultSets()
+            .SelectMany(x => x.QuestionResults)
+            .ToList();
+
+        var sampledItems = SampleQuestions(selectedQuestions, previousResults);
+      
+        InitializeQuiz(sampledItems);
+        StartTimer();
+        ShowQuizPanel();
+
+        return Task.CompletedTask;
+    }
+
+    private bool ValidateQuestionsSelected(List<Question> questions)
+    {
+        if (questions.Count != 0) return true;
+        Snackbar.Add("There were no questions selected. Please select your questions!", Severity.Warning);
+        return false;
+    }
+
+    private List<Item> SampleQuestions(List<Question> questions, List<QuestionResult> previousResults)
+    {
+        var settings = new SampleSettings
+        {
+            Questions = questions,
+            NumberOfQuestions = SelectedNumberOfQuestions,
+            Difficulty = SelectedDifficulty,
+            QuizStyle = SelectedQuizStyle,
+            SamplingMode = SelectedSamplingMode,
+            FlagType = SelectedFlagType,
+            PreviousResults = previousResults
+        };
+
+        return QuestionSampler.Sample(settings);
+    }
+
+    private void InitializeQuiz(List<Item> items)
+    {
+        CurrentModel = new TestRunModel
+        {
+            StartTime = DateTime.Now,
+            Items = items
+        };
+        _currentIndex = 0;
+    }
+
+    private void StartTimer()
+    {
+        if (IsTimerDisabled) return;
+
+        _quizTimer = new QuizTimer(
+            totalMinutes: SelectedTime,
+            onTick: async () => await InvokeAsync(StateHasChanged),
+            onComplete: async () => await InvokeAsync(Submit)
+        );
+
+        _quizTimer.Start();
+    }
+
+    private void ShowQuizPanel()
+    {
+        ShowQuiz = true;
+        ShowConfig = false;
+        Js.InvokeVoidAsync("scrollToElement", _panel1Ref3);
+    }
+
+    private Task Reset()
+    {
+        CurrentModel = null;
+        _currentIndex = 0;
+        ShowExplanation = false;
+        ShowResult = false;
+        _quizTimer?.Stop();
+        _quizTimer = null;
+        SelectedValues = [];
+
+        return Task.CompletedTask;
+    }
+
+    private void Grade()
+    {
+        if (CurrentModel != null)
+        {
+            CurrentQuestion.FinalAnswer = CurrentQuestion.SelectedAnswer;
+        }
+        ShowExplanation = true;
+    }
+}
+
+<style>
+    .equal-button {
+        width: 100%;   /* let MudItem control width */
+        max-width: 200px; /* optional cap */
+        margin-right: 10px;
+        margin-top: 10px;
+    }
+</style>

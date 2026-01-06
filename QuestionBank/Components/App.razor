@@ -1,0 +1,50 @@
+﻿@using System.Reflection
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <base href="/"/>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet"/>
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet"/>
+    <link rel="icon" type="image/ico" href="favicon.ico"/>
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">    
+    
+    <HeadOutlet @rendermode="InteractiveServer"/>
+</head>
+<body>
+    <Routes @rendermode="InteractiveServer"/>
+    <script src="_framework/blazor.web.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js?v=@(Assembly.GetAssembly(typeof(MudBlazor.AbstractLocalizationInterceptor))?.GetName().Version?.ToString())"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script>
+        window.renderLatex = () => {
+            document.querySelectorAll(".math").forEach(el => {
+                katex.render(el.textContent, el, { throwOnError: false });
+            });
+        };
+        window.scrollToElement = (element) => { if (!element) return; element.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" }); };
+        window.renderLatex2 = () => {
+            // Clear any previous math rendering
+            document.querySelectorAll(".math").forEach(el => {
+                el.innerHTML = el.innerText; // reset to raw formula text
+            });
+
+            // Now trigger MathJax/KaTeX again
+            if (window.MathJax) {
+                MathJax.typesetPromise();
+            }
+            if (window.katex) {
+                document.querySelectorAll(".math").forEach(el => {
+                    katex.render(el.innerText, el, { throwOnError: false });
+                });
+            }
+        };
+        
+        window.printElement = (elementId) => { const element = document.getElementById(elementId); if (!element) return; const printWindow = window.open('', '_blank', 'width=900,height=700'); printWindow.document.write(` <html> <head> <title>Print</title> <link rel="stylesheet" href="_content/MudBlazor/MudBlazor.min.css"> <style> body { padding: 20px; } </style> </head> <body> ${element.innerHTML} </body> </html> `); printWindow.document.close(); printWindow.focus(); printWindow.print(); printWindow.close(); };
+    </script>
+
+</body>
+</html>

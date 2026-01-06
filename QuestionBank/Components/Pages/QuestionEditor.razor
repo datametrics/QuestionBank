@@ -1,0 +1,236 @@
+﻿@inject ConfigService ConfigService
+@inject ISnackbar Snackbar
+@page "/Editor"
+@using QuestionBank.Components.Model
+@using QuestionBank.Components.Services
+<PageTitle>Editor</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Style="width: 100%;">
+    <MudText Typo="Typo.h5">Stored Questions</MudText>
+    @if (questions != null)
+    {
+        <MudDataGrid T="Question" Items="FilteredQuestions" Dense="true" Hover="true" Striped="true" Elevation="2">
+            <Columns>
+                <!-- Standard property binding -->
+                <PropertyColumn T="Question" TProperty="int" Property="x=> x.Id" Title="Id" />
+                <PropertyColumn T="Question" TProperty="Part" Property="x=> x.Part" Title="Part" Sortable="true" Filterable="true" Hideable="true" Resizable="true"/>
+                <PropertyColumn T="Question" TProperty="string?" Property="x=> x.BtId" Title="BtId" Sortable="true" Filterable="true" Hideable="true" Resizable="true"/>
+                <PropertyColumn T="Question" TProperty="int?" Property="x=> x.Topic" Title="Topic" Sortable="true" Filterable="true" Hideable="true" Resizable="true"/>
+                <PropertyColumn T="Question" TProperty="int?" Property="x=> x.Chapter" Title="Chapter" Sortable="true" Filterable="true" Hideable="true" Resizable="true"/>
+                <PropertyColumn T="Question" TProperty="string?" Property="@(q => q.QuestionBody.Substring(0, Math.Min(50, q.QuestionBody.Length)))" Title="Question" Style="min-width: 120px;"/>
+                <PropertyColumn T="Question" TProperty="string?" Property="@(q => q.Reference.Substring(0, Math.Min(50, q.Reference.Length)))" Title="Reference" />
+                <PropertyColumn T="Question" TProperty="Difficulty" Property="x=> x.Difficulty" Title="Difficulty" Sortable="true" Filterable="true" Hideable="true" Resizable="true"/>
+        
+                <!-- Custom content inside the column -->
+                <TemplateColumn T="Question" Title="Actions" Style="min-width: 170px;">
+                    <CellTemplate Context="q">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="() => OpenEditDialog(q)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="() => DeleteQuestion(q)" />
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+            <ToolBarContent>
+                <MudTextField Label="Filter questions..." @bind-Value="FilterText" Immediate="true" />
+            </ToolBarContent>
+            <PagerContent>
+                <MudDataGridPager T="Question" />
+            </PagerContent>
+        </MudDataGrid>
+
+    }
+    <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Success" OnClick="OpenAddDialog">Add Question</MudIconButton>
+
+    @if (QuestionToEdit != null)
+    {
+        <MudDialog @bind-Visible="IsDialogOpen" Options="new DialogOptions {FullWidth = true, MaxWidth = MaxWidth.Large, CloseOnEscapeKey = true}">
+            <DialogContent>
+                <MudTextField Label="Id" T="int" @bind-Value="QuestionToEdit.Id" Immediate="true" />
+                <MudSelect T="Part" @bind-Value="QuestionToEdit.Part" Label="Part">
+                @foreach (var p in Enum.GetValues(typeof(Part)).Cast<Part>())
+                {
+                    <MudSelectItem Value="@p">@p</MudSelectItem>
+                }
+                </MudSelect>
+                <MudTextField Label="BtId" T="string" @bind-Value="QuestionToEdit.BtId" Immediate="true" />
+                <MudTextField Label="Reference" T="string" @bind-Value="QuestionToEdit.Reference" Immediate="true" />
+                <MudTextField Label="Topic" T="int?" @bind-Value="QuestionToEdit.Topic" Immediate="true" />
+                <MudTextField Label="Chapter" T="int?" @bind-Value="QuestionToEdit.Chapter" Immediate="true" />
+                <MudTextField Label="LearningObjective" T="string" @bind-Value="QuestionToEdit.LearningObjective" Immediate="true" />
+
+                <MudGrid Justify="Justify.FlexEnd">
+                    <MudItem xs="11">
+                        <MudTextField Label="Question Body" AutoGrow="true"
+                                      Lines="2"
+                                      MaxLines="1000"
+                                      @bind-Value="QuestionToEdit.QuestionBody" />
+                    </MudItem>
+                    <MudItem xs="1">
+                        <MudButton OnClick="() => AddParagraphTag()">+P</MudButton>
+                        <MudButton OnClick="() => AddImageTag()">+Img</MudButton>
+                    </MudItem>
+                </MudGrid>
+                
+                
+                <MudGrid Justify="Justify.FlexEnd">
+                    <MudItem xs="11">
+                        <MudTextField Label="Explanation" AutoGrow="true"
+                                      Lines="2"
+                                      MaxLines="1000"
+                                      @bind-Value="QuestionToEdit.Explanation" L/>
+                    </MudItem>
+                    <MudItem xs="1">
+                        <MudButton OnClick="() => AddExpParagraphTag()">+P</MudButton>
+                        <MudButton OnClick="() => AddExpImageTag()">+Img</MudButton>
+                    </MudItem>
+                </MudGrid>
+              
+                <MudSelect T="Difficulty" @bind-Value="QuestionToEdit.Difficulty" Label="Difficulty">
+                    @foreach (var difficulty in Enum.GetValues(typeof(Difficulty)).Cast<Difficulty>())
+                    {
+                        <MudSelectItem Value="@difficulty">@difficulty</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect @bind-Value="QuestionToEdit.CorrectAnswerId" Label="Correct Answer">
+                    <MudSelectItem Value="1">1</MudSelectItem>
+                    <MudSelectItem Value="2">2</MudSelectItem>
+                    <MudSelectItem Value="3">3</MudSelectItem>
+                    <MudSelectItem Value="4">4</MudSelectItem>
+                </MudSelect>
+                <h4>Answers (4 Required)</h4>
+                <MudList T="string">
+                    <MudListItem>
+                        <MudTextField Label=@($"Answer 1") @bind-Value="QuestionToEdit.Answer1"/>
+                    </MudListItem>
+                    <MudListItem>
+                        <MudTextField Label=@($"Answer 2") @bind-Value="QuestionToEdit.Answer2"/>
+                    </MudListItem>
+                    <MudListItem>
+                        <MudTextField Label=@($"Answer 3") @bind-Value="QuestionToEdit.Answer3"/>
+                    </MudListItem>
+                    <MudListItem>
+                        <MudTextField Label=@($"Answer 4") @bind-Value="QuestionToEdit.Answer4"/>
+                    </MudListItem>
+                    
+                </MudList>
+                <MudDivider Vertical="false"></MudDivider>
+                <MudPaper Class="pa-16 ma-2" Outlined="true">
+                    <MudText Typo="Typo.h4" GutterBottom="true">Question Layout</MudText>
+                    <MudText Typo="Typo.body1">@(FormatText(QuestionToEdit.QuestionBody))</MudText>
+                    <br/>
+                    <MudRadioGroup T="string" Label="Select an answer">
+
+                        <MudStack Row="false">
+                            <MudRadio T="string" Label="@QuestionToEdit.Answer1"/>
+                            <MudRadio T="string" Label="@QuestionToEdit.Answer2"/>
+                            <MudRadio T="string" Label="@QuestionToEdit.Answer3"/>
+                            <MudRadio T="string" Label="@QuestionToEdit.Answer4"/>
+                        </MudStack>
+                    </MudRadioGroup>
+                    <br/>
+                    <br/>
+                    <MudText Typo="Typo.h4" GutterBottom="true">Explanation</MudText>
+                    <MudText Typo="Typo.body1">@(FormatText(QuestionToEdit.Explanation))</MudText>
+                </MudPaper>
+            </DialogContent>
+            <DialogActions>
+                <MudButton OnClick="SaveQuestion">Save</MudButton>
+                <MudButton OnClick="CloseDialog">Cancel</MudButton>
+            </DialogActions>
+        </MudDialog>
+    }
+        
+</MudContainer>
+
+
+
+@code {
+    private bool IsDialogOpen;
+    private Question? QuestionToEdit;
+    private string FilterText = "";
+    private List<Question> questions = [];
+
+    private IEnumerable<Question> FilteredQuestions
+    {
+        get
+        {
+            return (string.IsNullOrWhiteSpace(FilterText)
+                ? questions
+                : questions.Where(q =>
+                    q.QuestionBody.Contains(FilterText, StringComparison.OrdinalIgnoreCase) ||
+                    q.Explanation.Contains(FilterText, StringComparison.OrdinalIgnoreCase) ||
+                    (q.LearningObjective ?? "").Contains(FilterText, StringComparison.OrdinalIgnoreCase) ||
+                    q.Topic.GetValueOrDefault().ToString().Contains(FilterText, StringComparison.OrdinalIgnoreCase) ||
+                    q.Chapter.GetValueOrDefault().ToString().Contains(FilterText, StringComparison.OrdinalIgnoreCase) ||
+                    q.Reference!.ToString().Contains(FilterText, StringComparison.OrdinalIgnoreCase) ||
+                    (q.BtId ?? "").ToString().Contains(FilterText, StringComparison.OrdinalIgnoreCase) ||
+                    q.Difficulty.ToString().Contains(FilterText, StringComparison.OrdinalIgnoreCase))) ?? Array.Empty<Question>();
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        questions = ConfigService.LoadConfig();
+    }
+
+    private void AddParagraphTag()
+    {
+        if (QuestionToEdit != null) QuestionToEdit.QuestionBody += "<p></p>";
+        StateHasChanged(); // Forces UI refresh
+    }
+    private void AddImageTag()
+    {
+        QuestionToEdit.QuestionBody += "<img src=images/.png alt=Embedded Image />";
+        StateHasChanged(); // Forces UI refresh
+    }
+    private void AddExpParagraphTag()
+    {
+        QuestionToEdit.Explanation += "<p></p>";
+        StateHasChanged(); // Forces UI refresh
+    }
+    private void AddExpImageTag()
+    {
+        QuestionToEdit.Explanation += "<img src=images/.png alt=Embedded Image />";
+        StateHasChanged(); // Forces UI refresh
+    }
+   
+    private void OpenEditDialog(CellContext<Question> question)
+    {
+        IsDialogOpen = true;
+        QuestionToEdit = question.Item;
+    }
+
+    private void OpenAddDialog()
+    {
+        IsDialogOpen = true;
+        QuestionToEdit = new Question
+        {
+            QuestionBody = "<p></p>",
+            Explanation = "<p></p>",
+            Answer1 = "",
+            Answer2 = "",
+            Answer3 = "",
+            Answer4 = "",
+        };
+    }
+
+    private async Task SaveQuestion()
+    {
+        if (QuestionToEdit != null) await ConfigService.SaveQuestionAsync(QuestionToEdit);
+        IsDialogOpen = false;
+    }
+    private MarkupString FormatText(string? text)
+    {
+        return (MarkupString)(text?.Replace("\n", "<br>") ?? string.Empty);
+    }
+    
+    private async Task DeleteQuestion(CellContext<Question> q)
+    {
+        Snackbar.Add("Deletion is temporarily disabled", Severity.Error);
+        IsDialogOpen = false;
+    }
+
+    private void CloseDialog()
+    {
+        IsDialogOpen = false;
+    }
+}

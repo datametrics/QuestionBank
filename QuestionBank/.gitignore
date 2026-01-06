@@ -1,0 +1,56 @@
+# Build results
+bin/
+obj/
+out/
+
+# Visual Studio files
+.vs/
+*.user
+*.suo
+
+# Rider / JetBrains
+.idea/
+
+# Logs
+*.log
+
+# NuGet
+*.nupkg
+packages/
+.nuget/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Dotnet artifacts
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+
+# Publish output
+publish/
+*.pubxml
+*.pubxml.user
+
+# User secrets
+secrets.json
+
+
+# ASP.NET Core environment-specific settings
+appsettings.Development.json
+
+# Optional: ignore all appsettings except production
+# !appsettings.json
+!appsettings.Development.json
+
+# Temporary files
+*.tmp
+*.temp
+
+# JetBrains IDE settings
+.idea/
+*.iml
+*.iws
+*.ipr
