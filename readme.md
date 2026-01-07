@@ -106,10 +106,3 @@ This workflow allows you to quickly create question sets based on:
 - internal training material
 
 The tool does **not** store or redistribute the PDF itself — only your generated JSON question set.
-
----
-
-### 📸 UI Placeholder
-
-![JSON Upload Placeholder](docs/images/json-upload.png)
-
